@@ -1,12 +1,14 @@
-import os
 import logging
+import os
 import warnings
+
 import torch
 
-warnings.filterwarnings('ignore') # sklearn
+warnings.filterwarnings('ignore')  # sklearn
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 logging.getLogger('tensorflow').setLevel(logging.FATAL)
 from transformers import logging
+
 logging.set_verbosity_error()
 
 import sys
@@ -24,6 +26,7 @@ import platform
 import numpy as np
 from CEPC.src.ELib import ELib
 from CEPC.src.EDomainAdaptProj import EDomainAdaptProj
+
 
 def main():
     parser = argparse.ArgumentParser()
@@ -69,6 +72,7 @@ def main():
                              device, device_2, args.seed, args.tgt_d, args.src_d, args.cache_dir, args.flag)
         ELib.PASS()
     ELib.PASS()
+
 
 if __name__ == "__main__":
     print("Started at", ELib.get_time())
