@@ -142,7 +142,7 @@ class EDomainAdaptProj:
             # print(f'unlabeled_bundles.len = {len(unlabeled_bundles)}')
             # print(f'tgt_d = {tgt_d}')
             # print(f'src_d = {src_d}')
-            # # labeled_bundles.len = 4
+            # # labeled_bundles.len = 4         # 4个domain
             # # unlabeled_bundles.len = 4
             # # tgt_d = None
             # # src_d = None

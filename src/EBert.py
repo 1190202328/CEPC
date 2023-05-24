@@ -1,26 +1,24 @@
+import copy
 import gc
+import math
+import os
 import random
+import shutil
 import sys
 import time
-import copy
-import math
 
 import numpy as np
-import shutil
-import os
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from CEPC.src.EBertUtils import EBertDataset, ETaskState, ETokenAligner, EBalanceBatchMode, \
+    EInputListMode, EBertTrainingTools
+from CEPC.src.ELib import ELib
+from CEPC.src.EModels import EBertClassifier, EBertClassifierDACoordinated
 from termcolor import colored
 from torch.utils.data import DataLoader
 from torch.utils.data.sampler import WeightedRandomSampler
 from transformers import BertTokenizer
-
-from CEPC.src.EBertUtils import EBertDataset, ETaskState, ETokenAligner, EBalanceBatchMode, \
-    EInputListMode, EBertTrainingTools
-from CEPC.src.EModels import EBertClassifier, EBertClassifierDACoordinated
-from CEPC.src.ELib import ELib
 
 
 class EBertCLSType:
@@ -97,7 +95,8 @@ class EBert:
                                 for cur_lbl in lbl_values:
                                     class_count[cur_lbl] = labels.count(cur_lbl)
                                 cur_sample_weights = [(1 / len(class_count)) / class_count[entry] for entry in labels]
-                            elif balance_batch_mode_list[da_ind] == EBalanceBatchMode.meta_based_discrete:# was custom_based
+                            elif balance_batch_mode_list[
+                                da_ind] == EBalanceBatchMode.meta_based_discrete:  # was custom_based
                                 meta_values = set(cur_dataset.input_bundle.input_meta)
                                 class_count = dict()
                                 for cur_meta in meta_values:
@@ -117,7 +116,8 @@ class EBert:
                         cur_loader = DataLoader(dataset=cur_dataset, batch_size=config.batch_size,
                                                 drop_last=drop_last, sampler=sampler, num_workers=0)
                     else:
-                        batch_sampler = self.custom_batch_sampler_class(cur_dataset, config.batch_size, len(cur_dataset))
+                        batch_sampler = self.custom_batch_sampler_class(cur_dataset, config.batch_size,
+                                                                        len(cur_dataset))
                         cur_loader = DataLoader(dataset=cur_dataset, batch_sampler=batch_sampler, num_workers=0)
                 else:
                     cur_loader = DataLoader(dataset=cur_dataset, batch_size=config.batch_size, shuffle=False,
@@ -182,10 +182,12 @@ class EBert:
             with self.sync_obj.lock_dataset:
                 if self.sync_obj.sync_counter == self.sync_obj.model_count:
                     self.sync_obj.reset()
-                    self.init_seed(self.sync_obj.seed * (epoch_index + 10)) # not need it anymore, but will leave it
-                    batches = self.__loader_batches(dataset_list, config, shuffle, drop_last, input_mode, is_test, b_modes)
+                    self.init_seed(self.sync_obj.seed * (epoch_index + 10))  # not need it anymore, but will leave it
+                    batches = self.__loader_batches(dataset_list, config, shuffle, drop_last, input_mode, is_test,
+                                                    b_modes)
                 else:
-                    batches = self.__loader_batches(dataset_list, config, shuffle, drop_last, input_mode, is_test, b_modes)
+                    batches = self.__loader_batches(dataset_list, config, shuffle, drop_last, input_mode, is_test,
+                                                    b_modes)
                 self.sync_obj.sync_counter += 1
             while self.sync_obj.sync_counter < self.sync_obj.model_count:
                 self.sleep()
@@ -200,7 +202,7 @@ class EBert:
         if input_mode == EInputListMode.sequential:
             for name, item in batch.items():
                 if type(item) is torch.Tensor:
-                    result[name] = item.to(device) # takes a copy and moves it to the device
+                    result[name] = item.to(device)  # takes a copy and moves it to the device
                 else:
                     result[name] = item
         elif input_mode == EInputListMode.parallel or input_mode == EInputListMode.parallel_full:
@@ -486,7 +488,7 @@ class EBert:
         if bundle_list is None:
             return None, None
         dt_list = self.__get_dataset_bundle_list(bundle_list)
-        tasks = {task : ETaskState(task, early_stopping_patience)
+        tasks = {task: ETaskState(task, early_stopping_patience)
                  for cur_bundle in bundle_list
                  for task in cur_bundle.task_list}
         return dt_list, tasks
@@ -499,7 +501,45 @@ class EBert:
         for ba_ind, cur_batch in enumerate(batches):
             self.bert_classifier.train_step += 1  # to track the overall number inside the classifier
             while True:
+                # print(f'cur_batch.keys() = {cur_batch.keys()}')
+                # # cur_batch.keys() = dict_keys([0, 1, 2, 3, 'batch_count'])
+                # for key in cur_batch:
+                #     if key != 'batch_count':
+                #         print(f'cur_batch[{key}].keys() = {cur_batch[key].keys()}')
+                #     # cur_batch[0].keys() = dict_keys(['x', 'type', 'mask', 'query', 'weight', 'meta', 'docid', 'len', 'task_list', 'y_0', 'y_row_0'])
+
+                # for key in cur_batch[0]:
+                #     try:
+                #         print(f'cur_batch[0][{key}].shape = {cur_batch[0][key].shape}')
+                #     except:
+                #         print(f'cur_batch[0][{key}].len = {len(cur_batch[0][key])}')
+                # raise Exception
+                # # cur_batch[0][x].shape = torch.Size([50, 160])       # 样本，[B, L]
+                # # cur_batch[0][type].shape = torch.Size([50, 160])    # [B, L]
+                # # cur_batch[0][mask].shape = torch.Size([50, 160])    # [B, L]
+                # # cur_batch[0][query].shape = torch.Size([50, 160])   # [B, L]
+                # # cur_batch[0][weight].shape = torch.Size([50])       # [B]
+                # # cur_batch[0][meta].shape = torch.Size([50])         # [B]
+                # # cur_batch[0][docid].len = 50                        # [B]
+                # # cur_batch[0][len].shape = torch.Size([50])          # [B]
+                # # cur_batch[0][task_list].len = 1                     # ?
+                # # cur_batch[0][y_0].shape = torch.Size([50])          # [B]
+                # # cur_batch[0][y_row_0].shape = torch.Size([50, 2])   # [B, 2], one_hot编码的标签
+
                 outcome = self.bert_classifier(cur_batch, False)
+
+                # print(outcome.keys())
+                # for key in outcome:
+                #     for i, item in enumerate(outcome[key]):
+                #         print(f'outcome[{key}][{i}].shape = {item.shape}')
+                # # outcome[src_output][0].shape = torch.Size([50, 2])  [B, num_class]
+                # # outcome[src_output][1].shape = torch.Size([50, 2])
+                # # outcome[src_output][2].shape = torch.Size([50, 2])
+                # 输出三个域的样本的分类结果
+
+                # print(f'self.custom_train_loss_func = {self.custom_train_loss_func}')
+                # # self.custom_train_loss_func = <function EDomainAdaptMine1.__train_loss at 0x7f42de041dc0>
+
                 self.__process_loss(outcome, cur_batch, train_tasks, True, weighted_instance_loss)
                 if not self.delay_optimizer:
                     break
@@ -559,17 +599,17 @@ class EBert:
             ## deepcopy() cannot copy hooks! fix it later...
             if self.config.check_early_stopping and len(self.bert_classifier.logs) == 0:
                 for cur_task in valid_tasks.items():
-                        if cur_task[1].learning_state.should_stop(
-                                cur_task[1].loss, self.bert_classifier, self.config.device):
-                            self.bert_classifier.cpu()
-                            self.bert_classifier = cur_task[1].learning_state.best_model
-                            stopping_valid_task = cur_task
-                            break
+                    if cur_task[1].learning_state.should_stop(
+                            cur_task[1].loss, self.bert_classifier, self.config.device):
+                        self.bert_classifier.cpu()
+                        self.bert_classifier = cur_task[1].learning_state.best_model
+                        stopping_valid_task = cur_task
+                        break
         # self.config.batch_size = batch_size_copy
         return stopping_valid_task
 
-    def train(self, train_bundle_list, valid_bundle_list = None, weighted_instance_loss = False,
-              input_mode = EInputListMode.sequential, setup_learning_tools=True,
+    def train(self, train_bundle_list, valid_bundle_list=None, weighted_instance_loss=False,
+              input_mode=EInputListMode.sequential, setup_learning_tools=True,
               extra_scheduled_trainset_size=0, extra_scheduled_epochs=0, customized_optimizer_params=None,
               report_number_of_intervals=20, switch_on_train_mode=True, train_shuffle=True, train_drop_last=True,
               balance_batch_mode_list=None, minimum_train_loss=None):
@@ -590,7 +630,7 @@ class EBert:
         self.train_loss_early_stopped_epoch = -1
         for cur_ep in range(math.ceil(self.config.epoch_count)):
             self.current_train_epoch = cur_ep
-            self.bert_classifier.epoch_index += 1 # to track the overall number inside the classifier
+            self.bert_classifier.epoch_index += 1  # to track the overall number inside the classifier
             ## train
             if switch_on_train_mode:
                 self.bert_classifier.train()
@@ -608,7 +648,7 @@ class EBert:
                 print('saving checkpoint...')
                 self.save(str(cur_ep + 1))
             if stopping_valid_task is not None:
-                print('stopped early by \''+ stopping_valid_task[0] + '\'. restored the model of epoch {}'.
+                print('stopped early by \'' + stopping_valid_task[0] + '\'. restored the model of epoch {}'.
                       format(stopping_valid_task[1].learning_state.best_index + 1))
                 self.early_stopped_epoch = stopping_valid_task[1].learning_state.best_index + 1
                 break
@@ -650,7 +690,7 @@ class EBert:
         batches = self.generate_batches([test_dt], self.config, False, False, 0, EInputListMode.sequential)
         result_vecs = list()
         result_vecs_detail = list()
-        tasks = {test_bundle.task_list[0] : ETaskState(test_bundle.task_list[0])}
+        tasks = {test_bundle.task_list[0]: ETaskState(test_bundle.task_list[0])}
         print(title + 'labeling ', end=' ', flush=True)
         with torch.no_grad():
             for ba_ind, cur_batch in enumerate(batches):
@@ -693,15 +733,15 @@ class EBert:
         with open(os.path.join(output_dir, file_name), 'w') as ptr:
             for line in result_lbl:
                 ptr.write(str(line) + '\n')
-        with open(os.path.join(output_dir, file_name + '.h'), 'w') as ptr: # Human readable labels
+        with open(os.path.join(output_dir, file_name + '.h'), 'w') as ptr:  # Human readable labels
             for ind, line in enumerate(result_lbl):
                 ptr.write(test_bundle.tws[ind].Tweetid + '\t' + test_bundle.tws[ind].Userid +
                           '\t' + str(line) + '\n')
-        with open(os.path.join(output_dir, file_name + '.l'), 'w') as ptr: # Logits
+        with open(os.path.join(output_dir, file_name + '.l'), 'w') as ptr:  # Logits
             for line in result_logit:
                 ptr.write(' '.join(list(map(str, line))) + '\n')
         if len(result_vecs[0]) > 0:
-            with open(os.path.join(output_dir, file_name + '.v'), 'w') as ptr: # Sentence Vectors
+            with open(os.path.join(output_dir, file_name + '.v'), 'w') as ptr:  # Sentence Vectors
                 for line in result_vecs[0]:
                     ptr.write(' '.join(map(lambda param: '{:.5f}'.format(param), line)) + '\n')
             if len(result_vecs[1]) > 0:
@@ -722,5 +762,3 @@ class EBert:
                             ptr.write(text + ' ' + ' '.join(map(lambda param: '{:.5f}'.format(param), vec)) + '\n')
                         ptr.write('\n')
         return perf
-
-
