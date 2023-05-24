@@ -1,22 +1,20 @@
-import gc
 import copy
+import gc
 import math
 import statistics
 import sys
 
-from sklearn.linear_model import LogisticRegression
-from termcolor import colored
 import numpy as np
-from scipy.spatial import distance
-from sklearn import metrics
-
 import torch
 import torch.nn.functional as F
-
-from CEPC.src.ELib import ELib
-from CEPC.src.ETweet import ETweet
 from CEPC.src.EBert import EBert, EBertCLSType
 from CEPC.src.EBertUtils import EBertConfig, EBalanceBatchMode, EInputListMode, EInputBundle
+from CEPC.src.ELib import ELib
+from CEPC.src.ETweet import ETweet
+from scipy.spatial import distance
+from sklearn import metrics
+from sklearn.linear_model import LogisticRegression
+from termcolor import colored
 
 
 class EDomainAdaptMine1:
@@ -98,7 +96,7 @@ class EDomainAdaptMine1:
                 diff_to_mean = tgt[tgt_ind, :].view(1, -1) - tgt_mean
                 diff_to_mean_t = diff_to_mean.t()
                 cur_cov = tgt_scores_normal[tgt_ind] * diff_to_mean_t.matmul(diff_to_mean)
-                cur_cov = cur_cov / (1 - tgt_scores_normal_squared_sum) # normalize
+                cur_cov = cur_cov / (1 - tgt_scores_normal_squared_sum)  # normalize
                 diff = src_cov - cur_cov
                 doc_coral_loss = torch.norm(diff * diff, p='fro')
                 cur_result.append(doc_coral_loss.item())
@@ -157,7 +155,8 @@ class EDomainAdaptMine1:
         cls.bert_classifier.train_step = -1
         cls.train(data, input_mode=EInputListMode.parallel_full, switch_on_train_mode=False, train_shuffle=False,
                   train_drop_last=False)
-        result['coral_scores'] = EDomainAdaptMine1.__scores_coral(cls.bert_classifier.vectors, topics, cls.config.device)
+        result['coral_scores'] = EDomainAdaptMine1.__scores_coral(cls.bert_classifier.vectors, topics,
+                                                                  cls.config.device)
         ## train the src classifiers with different coral scales and store the info
         for cur_scale in coral_scales:
             ## reset the settings
@@ -200,7 +199,7 @@ class EDomainAdaptMine1:
             pred_cur = js_indices[pred_ind]
             pred_js_ind = context[pred_ind]['js-sorted'][pred_cur]
             pred_coral = coral_scales[pred_js_ind]
-            pred_lbls = scores[pred_coral]['labels'][pred_topic] # scores[str(pred_coral)]['labels'][pred_topic]
+            pred_lbls = scores[pred_coral]['labels'][pred_topic]  # scores[str(pred_coral)]['labels'][pred_topic]
             sum_pred_f1 = 0
             for gold_ind in range(len(src_labeled)):
                 if pred_ind != gold_ind:
@@ -209,7 +208,8 @@ class EDomainAdaptMine1:
                     gold_cur = js_indices[gold_ind]
                     gold_js_ind = context[gold_ind]['js-sorted'][gold_cur]
                     gold_coral = coral_scales[gold_js_ind]
-                    gold_lbls = scores[gold_coral]['labels'][gold_topic] # scores[str(gold_coral)]['labels'][gold_topic]
+                    gold_lbls = scores[gold_coral]['labels'][
+                        gold_topic]  # scores[str(gold_coral)]['labels'][gold_topic]
                     cur_pred_f1 = metrics.f1_score(gold_lbls, pred_lbls)
                     sum_pred_f1 += cur_pred_f1
             result += (sum_pred_f1 / (len(src_labeled) - 1))
@@ -223,11 +223,11 @@ class EDomainAdaptMine1:
             context.append(dict())
             src_neg_count = len(ETweet.filter_tweets_by_correct_label(cur_dom.tws, lc, lc.negative_new_label.new_label))
             src_pos_count = len(ETweet.filter_tweets_by_correct_label(cur_dom.tws, lc, lc.positive_new_label.new_label))
-            context[-1]['src-dist'] = [src_neg_count/len(cur_dom.tws), src_pos_count/len(cur_dom.tws)]
+            context[-1]['src-dist'] = [src_neg_count / len(cur_dom.tws), src_pos_count / len(cur_dom.tws)]
             context[-1]['tgt-dist'] = list()
             cur_topic = cur_dom.tws[0].Query
             for cur_scale in coral_scales:
-                cur_lbls = scores[cur_scale]['labels'][cur_topic] # scores[str(cur_scale)]['labels'][cur_topic]
+                cur_lbls = scores[cur_scale]['labels'][cur_topic]  # scores[str(cur_scale)]['labels'][cur_topic]
                 cur_neg_count = cur_lbls.count(lc.negative_new_label.new_label)
                 cur_pos_count = cur_lbls.count(lc.positive_new_label.new_label)
                 cur_distro = [cur_neg_count / len(cur_lbls), cur_pos_count / len(cur_lbls)]
@@ -248,7 +248,7 @@ class EDomainAdaptMine1:
             for cur_ind in range(len(src_labeled)):
                 cur_best_inds = copy.deepcopy(best_inds)
                 cur_best_inds[cur_ind] += 1
-                if cur_best_inds[cur_ind] >= len(coral_scales): # len(src_labeled): (BUG!)
+                if cur_best_inds[cur_ind] >= len(coral_scales):  # len(src_labeled): (BUG!)
                     continue
                 cur_best_value = EDomainAdaptMine1.__get_scales_and_encoders_target_preds(
                     src_labeled, scores, coral_scales, context, cur_best_inds)
@@ -290,7 +290,7 @@ class EDomainAdaptMine1:
         input_labels = list()
         input_meta = list()
         for cur_d, cur_topic in enumerate(topics):
-            cur_coral_score = model.bert_classifier.coral_scale[cur_d] # str(model.bert_classifier.coral_scale[cur_d])
+            cur_coral_score = model.bert_classifier.coral_scale[cur_d]  # str(model.bert_classifier.coral_scale[cur_d])
             input_labels.append(scores[cur_coral_score]['labels'][cur_topic])
             coral_scores = scores['coral_scores'][cur_topic]
             density_scores = scores[cur_coral_score]['density_scores'][cur_topic]
@@ -477,7 +477,8 @@ class EDomainAdaptMine1:
                         kl_loss_sum_shared += kl_loss_shared.mean()
                     ELib.PASS()
                 coral_loss_sum_balanced = (coral_loss_sum_balanced / c_count)
-                kl_loss_all =(kl_loss_sum/(d_count-1)) * model.bert_classifier.kl_scale * kl_schedule + kl_loss_sum_shared
+                kl_loss_all = (kl_loss_sum / (
+                            d_count - 1)) * model.bert_classifier.kl_scale * kl_schedule + kl_loss_sum_shared
                 loss = cls_loss_sum + coral_loss_sum_unbalanced + coral_loss_sum_balanced + kl_loss_all
             model.bert_classifier.stage = model.bert_classifier.stage % 1 + 1
             return loss, task_name, zeros_mat, zeros_vec
@@ -525,7 +526,7 @@ class EDomainAdaptMine1:
         print(colored('training the experts...', 'green'))
         cls.config.epoch_count = 3
         cls.bert_classifier.coral_density_balance = 1.0
-        cls.bert_classifier.kl_scale = 0.9 ## change this to experiment with KL (default is 0.9)
+        cls.bert_classifier.kl_scale = 0.9  ## change this to experiment with KL (default is 0.9)
         cls.bert_classifier.train_state = 4
         cls.bert_classifier.train_step = -1
         sc, en = EDomainAdaptMine1.__get_scales_and_encoders(lc, src_labeled, tgt_unlabeled, scores, coral_scales)
@@ -542,4 +543,3 @@ class EDomainAdaptMine1:
         del cls
         gc.collect()
         return perf
-

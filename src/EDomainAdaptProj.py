@@ -1,18 +1,17 @@
-import os
 import copy
+import os
+import statistics
 import sys
 
-from termcolor import colored
 import numpy as np
-import statistics
-
+from CEPC.src.EBertUtils import EInputBundle, EDomainAdaptParam
 from CEPC.src.EDomainAdaptMine1 import EDomainAdaptMine1
 from CEPC.src.EDomainAdaptSharedProj import EDACMD
-from CEPC.src.ELib import ELib
-from CEPC.src.ELblConf import ELblConf
 from CEPC.src.ELbl import ELbl
+from CEPC.src.ELblConf import ELblConf
+from CEPC.src.ELib import ELib
 from CEPC.src.EVar import EVar
-from CEPC.src.EBertUtils import EInputBundle, EDomainAdaptParam
+from termcolor import colored
 
 
 class EDomainAdaptProj:
@@ -60,7 +59,8 @@ class EDomainAdaptProj:
         result = None
         if cmd == EDACMD.da_m_mine1:
             result = EDomainAdaptProj.__da_multi_mine1(cur_itr, lc, model_path, output_dir, device, device_2,
-                seed, src_labeled, src_unlabeled, tgt_labeled, tgt_unlabeled, param)
+                                                       seed, src_labeled, src_unlabeled, tgt_labeled, tgt_unlabeled,
+                                                       param)
         return result
 
     @staticmethod
@@ -105,7 +105,7 @@ class EDomainAdaptProj:
     @staticmethod
     def run(cmd, itr, model_path, data_path, output_dir, device, device_2, seed, tgt_d, src_d, cache_dir, flag):
         EVar.BertBatchSize = 50
-        EVar.MaxSequence = None # for short docs: 160 # for long docs: 160 * 2 # for automatic: None
+        EVar.MaxSequence = None  # for short docs: 160 # for long docs: 160 * 2 # for automatic: None
         is_tuning = False
         tuning_rep = 2
 
@@ -137,8 +137,19 @@ class EDomainAdaptProj:
             cur_output_dir = output_dir + '_' + str(cur_itr) + '/'
             if not os.path.exists(cur_output_dir):
                 os.makedirs(cur_output_dir)
+
+            # print(f'labeled_bundles.len = {len(labeled_bundles)}')
+            # print(f'unlabeled_bundles.len = {len(unlabeled_bundles)}')
+            # print(f'tgt_d = {tgt_d}')
+            # print(f'src_d = {src_d}')
+            # # labeled_bundles.len = 4
+            # # unlabeled_bundles.len = 4
+            # # tgt_d = None
+            # # src_d = None
+
             qs, cur_results = EDomainAdaptProj.__run_one_iteration(cmd, lc, cur_itr, model_path, cur_output_dir, device,
-                device_2, seed, labeled_bundles, unlabeled_bundles, tgt_d, src_d, param)
+                                                                   device_2, seed, labeled_bundles, unlabeled_bundles,
+                                                                   tgt_d, src_d, param)
             cur_results = np.expand_dims(cur_results, 0)
             result = cur_results if result is None else np.append(result, cur_results, 0)
             if is_tuning:
@@ -159,6 +170,3 @@ class EDomainAdaptProj:
             print('Final Results:')
             EDomainAdaptProj.__print_iteration_results(qs, itr_detail=result)
         ELib.PASS()
-
-
-
