@@ -157,6 +157,10 @@ class EDomainAdaptMine1:
                   train_drop_last=False)
         result['coral_scores'] = EDomainAdaptMine1.__scores_coral(cls.bert_classifier.vectors, topics,
                                                                   cls.config.device)
+
+        # for key in result['coral_scores']:
+        #     print(f"result['coral_scores'][key] = {result['coral_scores'][key]}")
+
         ## train the src classifiers with different coral scales and store the info
         for cur_scale in coral_scales:
             ## reset the settings
@@ -478,7 +482,7 @@ class EDomainAdaptMine1:
                     ELib.PASS()
                 coral_loss_sum_balanced = (coral_loss_sum_balanced / c_count)
                 kl_loss_all = (kl_loss_sum / (
-                            d_count - 1)) * model.bert_classifier.kl_scale * kl_schedule + kl_loss_sum_shared
+                        d_count - 1)) * model.bert_classifier.kl_scale * kl_schedule + kl_loss_sum_shared
                 loss = cls_loss_sum + coral_loss_sum_unbalanced + coral_loss_sum_balanced + kl_loss_all
             model.bert_classifier.stage = model.bert_classifier.stage % 1 + 1
             return loss, task_name, zeros_mat, zeros_vec

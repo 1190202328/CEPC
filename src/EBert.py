@@ -528,6 +528,7 @@ class EBert:
 
                 outcome = self.bert_classifier(cur_batch, False)
 
+                # 1. 首先训练三个分类器
                 # print(outcome.keys())
                 # for key in outcome:
                 #     for i, item in enumerate(outcome[key]):
@@ -539,6 +540,21 @@ class EBert:
 
                 # print(f'self.custom_train_loss_func = {self.custom_train_loss_func}')
                 # # self.custom_train_loss_func = <function EDomainAdaptMine1.__train_loss at 0x7f42de041dc0>
+
+                # 2. 得到结果，计算得分
+                # if self.bert_classifier.train_state == 1:
+                #     print(outcome.keys())
+                #     for key in outcome:
+                #         for i, item in enumerate(outcome[key]):
+                #             print(f'outcome[{key}][{i}].shape = {item.shape}')
+                #     raise Exception
+                # # dict_keys(['src_pooled', 'tgt_pooled'])
+                # # outcome[src_pooled][0].shape = torch.Size([50, 768])    [B, C]
+                # # outcome[src_pooled][1].shape = torch.Size([50, 768])
+                # # outcome[src_pooled][2].shape = torch.Size([50, 768])
+                # # outcome[tgt_pooled][0].shape = torch.Size([50, 768])
+                # # outcome[tgt_pooled][1].shape = torch.Size([50, 768])
+                # # outcome[tgt_pooled][2].shape = torch.Size([50, 768])
 
                 self.__process_loss(outcome, cur_batch, train_tasks, True, weighted_instance_loss)
                 if not self.delay_optimizer:
